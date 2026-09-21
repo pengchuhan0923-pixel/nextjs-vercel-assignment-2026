@@ -1,4 +1,13 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is a [Next.js](https://nextjs.org) project that fetches study resources from Supabase and renders them as a responsive card list.
+
+## Environment variables
+
+Copy `.env.example` to `.env.local` and set:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+The Supabase table uses Row Level Security with a public read-only policy.
 
 ## Getting Started
 
