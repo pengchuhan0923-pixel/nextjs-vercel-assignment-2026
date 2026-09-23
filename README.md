@@ -1,4 +1,4 @@
-This is a [Next.js](https://nextjs.org) project that fetches study resources from Supabase and renders them as a responsive card list.
+This is a [Next.js](https://nextjs.org) project with Google OAuth through Supabase Auth. The public landing page links to a protected study-resources route.
 
 ## Environment variables
 
@@ -6,8 +6,15 @@ Copy `.env.example` to `.env.local` and set:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
 
 The Supabase table uses Row Level Security with a public read-only policy.
+
+## Authentication routes
+
+- `/login` signs in with a Google ID token through Supabase Auth.
+- `/auth/callback` handles the completed login without extra query parameters.
+- `/protected` verifies the user on the server and redirects signed-out visitors.
 
 ## Getting Started
 
