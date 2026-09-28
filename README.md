@@ -15,6 +15,9 @@ The Supabase table uses Row Level Security with a public read-only policy.
 - `/login` signs in with a Google ID token through Supabase Auth.
 - `/auth/callback` handles the completed login without extra query parameters.
 - `/protected` verifies the user on the server and redirects signed-out visitors.
+- `/profile` prompts first-time users for their first and last name and lets them update their profile photo.
+
+The `profiles` table is populated by an `auth.users` trigger. Profile photos are uploaded to the `avatars` Supabase Storage bucket; only the resulting public URL is stored in the relational table.
 
 ## Getting Started
 
