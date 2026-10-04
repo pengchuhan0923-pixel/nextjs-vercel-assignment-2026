@@ -19,6 +19,10 @@ The Supabase table uses Row Level Security with a public read-only policy.
 
 The `profiles` table is populated by an `auth.users` trigger. Profile photos are uploaded to the `avatars` Supabase Storage bucket; only the resulting public URL is stored in the relational table.
 
+## Caption voting
+
+The authenticated `/captions` route lets users upvote or downvote captions. Every submission verifies the Supabase user on the server and inserts a new row into `caption_votes` with the user ID, caption ID, and vote value.
+
 ## Getting Started
 
 First, run the development server:
