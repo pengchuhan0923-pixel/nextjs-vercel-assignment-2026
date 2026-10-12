@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -19,7 +20,8 @@ export async function generateCaption(formData: FormData) {
   const vibe = String(formData.get("vibe") ?? "witty").trim();
   if (scene.length < 8 || scene.length > 300) redirect(captionsUrl("Describe your scene in 8–300 characters.", "error"));
 
-  const gatewayToken = process.env.VERCEL_OIDC_TOKEN;
+  const requestHeaders = await headers();
+  const gatewayToken = requestHeaders.get("x-vercel-oidc-token") ?? process.env.VERCEL_OIDC_TOKEN;
   if (!gatewayToken) redirect(captionsUrl("AI generation is not configured yet.", "error"));
 
   const prompt = [
