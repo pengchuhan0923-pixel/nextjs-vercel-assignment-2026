@@ -56,7 +56,7 @@ export default async function ProtectedPage() {
           </div>
           <div className="flex gap-3">
             <Link href="/captions" className="rounded-xl bg-amber-300 px-5 py-3 font-semibold text-slate-950 hover:bg-amber-200">
-              Rate captions
+              Campus Caption Clash
             </Link>
             <Link href="/profile" className="rounded-xl bg-emerald-300 px-5 py-3 font-semibold text-slate-950 hover:bg-emerald-200">
               Profile
