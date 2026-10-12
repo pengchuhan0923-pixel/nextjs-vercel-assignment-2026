@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-3.8-flash";
 
 function captionsUrl(message: string, type: "success" | "error" = "success") {
   return `/captions?${type}=${encodeURIComponent(message)}`;
@@ -31,16 +31,22 @@ export async function generateCaption(formData: FormData) {
   ].join("\n");
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 100, temperature: 0.9 } }),
+      body: JSON.stringify({ model: GEMINI_MODEL, input: prompt, store: false }),
       cache: "no-store",
     });
     if (!response.ok) throw new Error(`Gemini returned ${response.status}`);
 
-    const result = (await response.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    const result = (await response.json()) as {
+      steps?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
+    };
+    const text = result.steps
+      ?.filter((step) => step.type === "model_output")
+      .flatMap((step) => step.content ?? [])
+      .find((content) => content.type === "text")
+      ?.text?.trim();
     if (!text) throw new Error("Gemini returned an empty response");
 
     const { error } = await supabase.from("captions").insert({
