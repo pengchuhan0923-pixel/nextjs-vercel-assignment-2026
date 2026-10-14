@@ -42,7 +42,8 @@ export async function generateCaption(formData: FormData) {
       body: JSON.stringify({
         model: AI_MODEL,
         input: prompt,
-        max_output_tokens: 100,
+        max_output_tokens: 500,
+        reasoning: { effort: "low" },
         temperature: 0.9,
       }),
       cache: "no-store",
@@ -55,7 +56,6 @@ export async function generateCaption(formData: FormData) {
     };
     const text = result.output_text?.trim() || result.output
       ?.flatMap((item) => item.content ?? [])
-      .filter((item) => item.type === "output_text")
       .map((item) => item.text ?? "")
       .join("")
       .trim();
