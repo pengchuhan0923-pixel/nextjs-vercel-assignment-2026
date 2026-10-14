@@ -52,7 +52,7 @@ export async function generateCaption(formData: FormData) {
       body: JSON.stringify({
         model: AI_MODEL,
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 120,
+        max_tokens: 1000,
         reasoning: { effort: "low", exclude: true },
         temperature: 0.9,
         response_format: {
@@ -92,7 +92,7 @@ export async function generateCaption(formData: FormData) {
     }
 
     const { error } = await supabase.from("captions").insert({
-      text: text.slice(0, 500), context: scene, prompt, model: AI_MODEL, created_by: user.id, is_ai_generated: true,
+      text: text.slice(0, 180), context: scene, prompt, model: AI_MODEL, created_by: user.id, is_ai_generated: true,
     });
     if (error) throw new Error(error.message);
   } catch (error) {

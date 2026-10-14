@@ -33,9 +33,11 @@ export default async function CaptionsPage({ searchParams }: { searchParams: Pro
 
   const rawCaptions = (captions ?? []) as Caption[];
   const captionList = rawCaptions.filter((caption) => !/thinking process|analyze the request/i.test(caption.text));
+  const visibleCaptionIds = new Set(captionList.map((caption) => caption.id));
   const voteList = (votes ?? []) as CaptionVote[];
   const latestVotes = new Map<string, CaptionVote>();
   for (const vote of voteList) {
+    if (!visibleCaptionIds.has(vote.caption_id)) continue;
     const key = `${vote.caption_id}:${vote.user_id}`;
     if (!latestVotes.has(key)) latestVotes.set(key, vote);
   }
@@ -58,7 +60,7 @@ export default async function CaptionsPage({ searchParams }: { searchParams: Pro
         </nav>
 
         <header className="mt-12 grid gap-8 lg:grid-cols-[1.15fr_.85fr] lg:items-end">
-          <div><p className="text-sm font-black uppercase tracking-[0.28em] text-fuchsia-300">Columbia meets NYC</p><h1 className="mt-4 text-5xl font-black leading-none sm:text-7xl">Campus Caption Clash</h1><p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">Create a caption from campus chaos, vote on the community feed, and come back for a new daily challenge.</p></div>
+          <div><p className="text-sm font-black uppercase tracking-[0.28em] text-fuchsia-300">Columbia meets NYC</p><h1 className="mt-4 text-5xl font-black leading-none sm:text-7xl">Campus Caption Clash</h1><p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">Create a caption from campus chaos, vote on the community feed, and come back for a fresh community challenge.</p></div>
           <aside className="rounded-3xl border border-cyan-300/25 bg-cyan-300/10 p-5 text-sm leading-6 text-cyan-100"><strong className="block text-base text-white">Community challenge</strong><span className="mt-2 block">{dailyPrompts[challengeIndex]}</span><span className="mt-3 block text-xs font-bold uppercase tracking-widest text-cyan-300">A fresh reason to create</span></aside>
         </header>
 
