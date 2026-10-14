@@ -4,7 +4,17 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-const AI_MODEL = "openrouter/free";
+const AI_MODEL = "liquid/lfm-2.5-2.6b:free";
+
+function cleanCaption(value: string) {
+  return value
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .replace(/^caption\s*:\s*/i, "")
+    .replace(/^["“]|["”]$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 function captionsUrl(message: string, type: "success" | "error" = "success") {
   return `/captions?${type}=${encodeURIComponent(message)}`;
@@ -31,7 +41,7 @@ export async function generateCaption(formData: FormData) {
   ].join("\n");
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/responses", {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -41,25 +51,45 @@ export async function generateCaption(formData: FormData) {
       },
       body: JSON.stringify({
         model: AI_MODEL,
-        input: prompt,
-        max_output_tokens: 500,
-        reasoning: { effort: "low" },
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 120,
+        reasoning: { effort: "low", exclude: true },
         temperature: 0.9,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "campus_caption",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: { caption: { type: "string" } },
+              required: ["caption"],
+              additionalProperties: false,
+            },
+          },
+        },
       }),
       cache: "no-store",
     });
     if (!response.ok) throw new Error(`OpenRouter returned ${response.status}`);
 
     const result = (await response.json()) as {
-      output_text?: string;
-      output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+      choices?: Array<{ message?: { content?: string } }>;
     };
-    const text = result.output_text?.trim() || result.output
-      ?.flatMap((item) => item.content ?? [])
-      .map((item) => item.text ?? "")
-      .join("")
-      .trim();
-    if (!text) throw new Error("OpenRouter returned an empty response");
+    const content = result.choices?.[0]?.message?.content?.trim();
+    if (!content) throw new Error("OpenRouter returned an empty response");
+
+    let text = content;
+    try {
+      const parsed = JSON.parse(content) as { caption?: string };
+      text = parsed.caption ?? content;
+    } catch {
+      // The cleanup below also supports providers that return plain text.
+    }
+    text = cleanCaption(text);
+    if (!text || /thinking process|analyze the request/i.test(text)) {
+      throw new Error("OpenRouter did not return a display-ready caption");
+    }
 
     const { error } = await supabase.from("captions").insert({
       text: text.slice(0, 500), context: scene, prompt, model: AI_MODEL, created_by: user.id, is_ai_generated: true,
