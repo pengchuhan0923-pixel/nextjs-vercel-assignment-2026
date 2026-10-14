@@ -31,7 +31,7 @@ export async function generateCaption(formData: FormData) {
   ].join("\n");
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://openrouter.ai/api/v1/responses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -41,19 +41,24 @@ export async function generateCaption(formData: FormData) {
       },
       body: JSON.stringify({
         model: AI_MODEL,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 100,
+        input: prompt,
+        max_output_tokens: 100,
         temperature: 0.9,
-        stream: false,
       }),
       cache: "no-store",
     });
     if (!response.ok) throw new Error(`OpenRouter returned ${response.status}`);
 
     const result = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      output_text?: string;
+      output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
     };
-    const text = result.choices?.[0]?.message?.content?.trim();
+    const text = result.output_text?.trim() || result.output
+      ?.flatMap((item) => item.content ?? [])
+      .filter((item) => item.type === "output_text")
+      .map((item) => item.text ?? "")
+      .join("")
+      .trim();
     if (!text) throw new Error("OpenRouter returned an empty response");
 
     const { error } = await supabase.from("captions").insert({
