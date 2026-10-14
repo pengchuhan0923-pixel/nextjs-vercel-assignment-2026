@@ -1,11 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-const AI_MODEL = "google/gemini-3-flash";
+const AI_MODEL = "openrouter/free";
 
 function captionsUrl(message: string, type: "success" | "error" = "success") {
   return `/captions?${type}=${encodeURIComponent(message)}`;
@@ -20,9 +19,8 @@ export async function generateCaption(formData: FormData) {
   const vibe = String(formData.get("vibe") ?? "witty").trim();
   if (scene.length < 8 || scene.length > 300) redirect(captionsUrl("Describe your scene in 8–300 characters.", "error"));
 
-  const requestHeaders = await headers();
-  const gatewayToken = requestHeaders.get("x-vercel-oidc-token") ?? process.env.VERCEL_OIDC_TOKEN;
-  if (!gatewayToken) redirect(captionsUrl("AI generation is not configured yet.", "error"));
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  if (!openRouterKey) redirect(captionsUrl("AI generation is not configured yet.", "error"));
 
   const prompt = [
     "Write one original social-media caption for a Columbia University student in New York City.",
@@ -33,9 +31,14 @@ export async function generateCaption(formData: FormData) {
   ].join("\n");
 
   try {
-    const response = await fetch("https://ai-gateway.vercel.sh/v1/chat/completions", {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${gatewayToken}` },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${openRouterKey}`,
+        "HTTP-Referer": "https://nextjs-vercel-assignment-2026.vercel.app",
+        "X-Title": "Campus Caption Clash",
+      },
       body: JSON.stringify({
         model: AI_MODEL,
         messages: [{ role: "user", content: prompt }],
@@ -45,13 +48,13 @@ export async function generateCaption(formData: FormData) {
       }),
       cache: "no-store",
     });
-    if (!response.ok) throw new Error(`AI Gateway returned ${response.status}`);
+    if (!response.ok) throw new Error(`OpenRouter returned ${response.status}`);
 
     const result = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
     const text = result.choices?.[0]?.message?.content?.trim();
-    if (!text) throw new Error("Gemini returned an empty response");
+    if (!text) throw new Error("OpenRouter returned an empty response");
 
     const { error } = await supabase.from("captions").insert({
       text: text.slice(0, 500), context: scene, prompt, model: AI_MODEL, created_by: user.id, is_ai_generated: true,
