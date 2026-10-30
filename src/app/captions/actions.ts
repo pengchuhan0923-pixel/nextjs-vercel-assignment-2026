@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-const AI_MODEL = "liquid/lfm-2.5-2.6b:free";
+// Let OpenRouter choose an available free model instead of making the whole
+// feature depend on a single provider/model staying online.
+const AI_MODEL = "openrouter/free";
 
 function cleanCaption(value: string) {
   return value
@@ -52,22 +54,8 @@ export async function generateCaption(formData: FormData) {
       body: JSON.stringify({
         model: AI_MODEL,
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 1000,
-        reasoning: { effort: "low", exclude: true },
+        max_tokens: 220,
         temperature: 0.9,
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "campus_caption",
-            strict: true,
-            schema: {
-              type: "object",
-              properties: { caption: { type: "string" } },
-              required: ["caption"],
-              additionalProperties: false,
-            },
-          },
-        },
       }),
       cache: "no-store",
     });
