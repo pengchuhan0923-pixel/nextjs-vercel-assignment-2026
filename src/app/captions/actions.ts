@@ -4,9 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-// Use a free instruction-tuned model with reasoning disabled so the short
-// completion budget is spent on the caption instead of hidden thinking.
-const AI_MODEL = "google/gemma-4-26b-a4b-it:free";
+const AI_MODEL = "gpt-6-luna";
+
+class CaptionGenerationError extends Error {
+  constructor(public readonly userMessage: string, message: string) {
+    super(message);
+  }
+}
 
 function cleanCaption(value: string) {
   return value
@@ -31,8 +35,8 @@ export async function generateCaption(formData: FormData) {
   const vibe = String(formData.get("vibe") ?? "witty").trim();
   if (scene.length < 8 || scene.length > 300) redirect(captionsUrl("Describe your scene in 8–300 characters.", "error"));
 
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  if (!openRouterKey) redirect(captionsUrl("AI generation is not configured yet.", "error"));
+  const openAIKey = process.env.OPENAI_API_KEY;
+  if (!openAIKey) redirect(captionsUrl("AI generation is not configured. Please contact the site owner.", "error"));
 
   const prompt = [
     "Write one original social-media caption for a Columbia University student in New York City.",
@@ -43,30 +47,49 @@ export async function generateCaption(formData: FormData) {
   ].join("\n");
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${openRouterKey}`,
-        "HTTP-Referer": "https://nextjs-vercel-assignment-2026.vercel.app",
-        "X-Title": "Campus Caption Clash",
+        Authorization: `Bearer ${openAIKey}`,
       },
       body: JSON.stringify({
         model: AI_MODEL,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 500,
-        reasoning: { enabled: false },
-        temperature: 0.9,
+        input: prompt,
+        reasoning: { effort: "none" },
+        max_output_tokens: 120,
+        store: false,
       }),
       cache: "no-store",
     });
-    if (!response.ok) throw new Error(`OpenRouter returned ${response.status}`);
+    if (!response.ok) {
+      const requestId = response.headers.get("x-request-id") ?? "unavailable";
+      const messages: Record<number, string> = {
+        400: "The AI request was rejected. Please adjust the scene and try again.",
+        401: "AI generation is not configured correctly. Please contact the site owner.",
+        403: "The AI service denied this request. Please contact the site owner.",
+        429: "The AI service is temporarily rate-limited or out of credits. Please try again later.",
+      };
+      const userMessage = messages[response.status]
+        ?? (response.status >= 500
+          ? "The AI service is temporarily unavailable. Please try again shortly."
+          : "The AI service could not process this request. Please try again.");
+      throw new CaptionGenerationError(userMessage, `OpenAI returned ${response.status}; request ${requestId}`);
+    }
 
     const result = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
     };
-    const content = result.choices?.[0]?.message?.content?.trim();
-    if (!content) throw new Error("OpenRouter returned an empty response");
+    const content = result.output
+      ?.flatMap((item) => item.content ?? [])
+      .find((item) => item.type === "output_text")
+      ?.text?.trim();
+    if (!content) {
+      throw new CaptionGenerationError(
+        "The AI returned no caption. Please try again.",
+        "OpenAI returned an empty response",
+      );
+    }
 
     let text = content;
     try {
@@ -77,16 +100,27 @@ export async function generateCaption(formData: FormData) {
     }
     text = cleanCaption(text);
     if (!text || /thinking process|analyze the request/i.test(text)) {
-      throw new Error("OpenRouter did not return a display-ready caption");
+      throw new CaptionGenerationError(
+        "The AI response was not display-ready. Please try again.",
+        "OpenAI did not return a display-ready caption",
+      );
     }
 
     const { error } = await supabase.from("captions").insert({
       text: text.slice(0, 180), context: scene, prompt, model: AI_MODEL, created_by: user.id, is_ai_generated: true,
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      throw new CaptionGenerationError(
+        "The caption was generated but could not be saved. Please try again.",
+        `Supabase insert failed: ${error.message}`,
+      );
+    }
   } catch (error) {
     console.error("Caption generation failed", error);
-    redirect(captionsUrl("The caption could not be generated. Please try again.", "error"));
+    const message = error instanceof CaptionGenerationError
+      ? error.userMessage
+      : "Could not reach the AI service. Check your connection and try again.";
+    redirect(captionsUrl(message, "error"));
   }
 
   revalidatePath("/captions");
