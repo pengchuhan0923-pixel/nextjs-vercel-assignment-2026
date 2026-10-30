@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-// Let OpenRouter choose an available free model instead of making the whole
-// feature depend on a single provider/model staying online.
-const AI_MODEL = "openrouter/free";
+// Use a free instruction-tuned model with reasoning disabled so the short
+// completion budget is spent on the caption instead of hidden thinking.
+const AI_MODEL = "google/gemma-4-26b-a4b-it:free";
 
 function cleanCaption(value: string) {
   return value
@@ -54,7 +54,8 @@ export async function generateCaption(formData: FormData) {
       body: JSON.stringify({
         model: AI_MODEL,
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 220,
+        max_tokens: 500,
+        reasoning: { enabled: false },
         temperature: 0.9,
       }),
       cache: "no-store",
